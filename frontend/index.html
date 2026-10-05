@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SALESTORM 2026 — Live AWS 3D Simulation & Presentation Console</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Three.js and OrbitControls for 3D Architecture Canvas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+  <!-- Top App Header -->
+  <header>
+    <div class="logo-container">
+      <div class="logo-badge">
+        <span>⚡</span> SALESTORM
+      </div>
+      <div class="logo-title">
+        <h1>AWS Cloud Architecture & Flash-Sale Simulation</h1>
+        <p>Region: AWS ap-south-1 (Mumbai) | Target VPC: 10.0.0.0/16</p>
+      </div>
+    </div>
+
+    <div class="header-status">
+      <div class="mode-toggle">
+        <button class="mode-btn active" data-mode="live">☁️ Live AWS</button>
+        <button class="mode-btn" data-mode="sim">🔬 Local Sim</button>
+      </div>
+
+      <div class="live-badge" id="live-status-pill">
+        <span class="pulse-dot"></span> LIVE AWS (ALB)
+      </div>
+    </div>
+  </header>
+
+  <!-- 5-Act Presentation Roadmap Navigation -->
+  <nav class="presentation-bar">
+    <button class="act-tab active" data-act="1">
+      <span class="act-num">Act 1 (1 min)</span>
+      <div class="act-name">Live API & Swagger Docs</div>
+      <div class="act-time">OpenAPI 3.1 & ALB Ingress</div>
+    </button>
+    <button class="act-tab" data-act="2">
+      <span class="act-num">Act 2 (1 min)</span>
+      <div class="act-name">Health & Live Telemetry</div>
+      <div class="act-time">/health & /metrics Probes</div>
+    </button>
+    <button class="act-tab" data-act="3">
+      <span class="act-num">Act 3 (1.5 min)</span>
+      <div class="act-name">Scarcity & Concurrency</div>
+      <div class="act-time">10,000 Contenders vs 100 Units</div>
+    </button>
+    <button class="act-tab" data-act="4">
+      <span class="act-num">Act 4 (1 min)</span>
+      <div class="act-name">CloudWatch Observability</div>
+      <div class="act-time">X-Correlation-ID & SNS Alerts</div>
+    </button>
+    <button class="act-tab" data-act="5">
+      <span class="act-num">Act 5 (30 sec)</span>
+      <div class="act-name">Fargate Auto-Scaling</div>
+      <div class="act-time">Tasks Scale 2 ➔ 20 Replicas</div>
+    </button>
+  </nav>
+
+  <!-- Main Split-Screen Dashboard -->
+  <main class="dashboard-layout">
+
+    <!-- LEFT COLUMN: 3D Interactive AWS Cloud Architecture Canvas -->
+    <section class="scene-panel glass">
+      <div class="scene-header">
+        <div class="scene-title">
+          <h3>Interactive 3D AWS Topology (Three.js WebGL)</h3>
+          <p>Drag to rotate • Scroll to zoom • Click any node to inspect Security Groups & VPC config</p>
+        </div>
+        <div class="scene-controls">
+          <button class="ctrl-btn" data-view="default">Default</button>
+          <button class="ctrl-btn" data-view="topdown">Top-Down</button>
+          <button class="ctrl-btn" data-view="compute">ECS Fargate</button>
+          <button class="ctrl-btn" data-view="data">Data Tier</button>
+        </div>
+      </div>
+
+      <div id="three-canvas-container"></div>
+
+      <div class="scene-footer">
+        <div class="topology-legend">
+          <div class="legend-item"><span class="legend-color" style="background:#00f2fe"></span> Ingress / Clients</div>
+          <div class="legend-item"><span class="legend-color" style="background:#00f5a0"></span> ALB & ECS Fargate</div>
+          <div class="legend-item"><span class="legend-color" style="background:#f59e0b"></span> ElastiCache Redis</div>
+          <div class="legend-item"><span class="legend-color" style="background:#a855f7"></span> RDS PostgreSQL 16</div>
+          <div class="legend-item"><span class="legend-color" style="background:#f43f5e"></span> Secrets & ECR</div>
+          <div class="legend-item"><span class="legend-color" style="background:#ec4899"></span> CloudWatch & SNS</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: Control, Simulation & Presentation Console -->
+    <section class="control-panel">
+
+      <!-- Live Telemetry Stats Bar -->
+      <div class="metrics-grid">
+        <div class="metric-card glass">
+          <div class="metric-label">Available Stock</div>
+          <div class="metric-value color-avail" id="metric-avail">100</div>
+          <div class="metric-sub">Redis Atomic Lua Key</div>
+        </div>
+        <div class="metric-card glass">
+          <div class="metric-label">Reserved (300s)</div>
+          <div class="metric-value color-res" id="metric-res">0</div>
+          <div class="metric-sub">Active Leases</div>
+        </div>
+        <div class="metric-card glass">
+          <div class="metric-label">Confirmed Sold</div>
+          <div class="metric-value color-sold" id="metric-sold">0</div>
+          <div class="metric-sub">ACID Orders</div>
+        </div>
+        <div class="metric-card glass">
+          <div class="metric-label">Live ALB Latency</div>
+          <div class="metric-value color-lat" id="metric-lat">18ms</div>
+          <div class="metric-sub">Round-trip Time</div>
+        </div>
+      </div>
+
+      <!-- ACT 1: Live Swagger UI & OpenAPI Docs -->
+      <div class="act-card glass" id="act-1-card">
+        <div class="act-card-header">
+          <div class="act-card-title">
+            <h2>🟢 Act 1: Live OpenAPI Documentation & ALB Gateway</h2>
+            <p>Demonstrating our production container deployment behind the AWS ALB in Mumbai</p>
+          </div>
+        </div>
+
+        <div class="speaker-notes-box">
+          <strong>Speaker Script (What to say to Judges):</strong>
+          <p>"Judges, we have deployed the SALESTORM Flash Sale platform live on AWS Fargate in the Mumbai region behind a high-availability Application Load Balancer. Here is our live OpenAPI documentation running directly from the cloud."</p>
+        </div>
+
+        <div class="test-actions">
+          <button class="btn-primary" id="btn-open-docs">
+            <span>🌐</span> Open Live Swagger UI (Cloud Endpoint)
+          </button>
+          <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); word-break: break-all;">
+            Target Endpoint: http://salestorm-alb-499690526.ap-south-1.elb.amazonaws.com/docs
+          </div>
+        </div>
+      </div>
+
+      <!-- ACT 2: Subsystem Health & Metrics Probe -->
+      <div class="act-card glass" id="act-2-card" style="display:none;">
+        <div class="act-card-header">
+          <div class="act-card-title">
+            <h2>🟢 Act 2: Subsystem Health Probes & Live Telemetry</h2>
+            <p>Real-time health verification across downstream microservices and Redis inventory</p>
+          </div>
+        </div>
+
+        <div class="speaker-notes-box">
+          <strong>Speaker Script (What to say to Judges):</strong>
+          <p>"Our /health endpoint performs real-time health checks on our downstream services. Our /metrics endpoint shows our live inventory state: 100 initial stock, 0 reservations, and zero latency."</p>
+        </div>
+
+        <div class="test-actions">
+          <button class="btn-primary" id="btn-refresh-health">
+            <span>🔄</span> Probe Live /health & /metrics Endpoints
+          </button>
+          <div style="display:flex; gap:10px;">
+            <button class="btn-secondary" onclick="window.open('http://salestorm-alb-499690526.ap-south-1.elb.amazonaws.com/health', '_blank')">View Raw /health JSON</button>
+            <button class="btn-secondary" onclick="window.open('http://salestorm-alb-499690526.ap-south-1.elb.amazonaws.com/metrics', '_blank')">View Raw /metrics JSON</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACT 3: Scarcity & Concurrency Handling -->
+      <div class="act-card glass" id="act-3-card" style="display:none;">
+        <div class="act-card-header">
+          <div class="act-card-title">
+            <h2>🟢 Act 3: Live Flash Sale Reservation & Concurrency Engine</h2>
+            <p>Single-threaded Redis atomic Lua scripts guarantee zero overselling</p>
+          </div>
+        </div>
+
+        <div class="speaker-notes-box">
+          <strong>Speaker Script (What to say to Judges):</strong>
+          <p>"When a reservation occurs, Redis locks and decrements the available inventory atomically in sub-milliseconds with lease expiration, preventing overselling. Idempotency keys prevent double purchases even if the user retries."</p>
+        </div>
+
+        <div class="test-actions">
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <button class="btn-primary" id="btn-reserve-single">
+              <span>⚡</span> Execute Live Reservation (Qty=1)
+            </button>
+            <button class="btn-secondary" id="btn-test-idempotency">
+              <span>🔒</span> Test Double-Click Idempotency
+            </button>
+          </div>
+
+          <!-- 10,000 Contenders Simulation Engine -->
+          <div style="margin-top: 6px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.06);">
+            <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
+              <span style="font-size:12px; font-weight:600;">10,000 Contenders Flash Sale Burst</span>
+              <span style="font-size:11px; font-family:var(--font-mono); color:var(--accent-cyan);" id="sim-processed">0 / 10,000</span>
+            </div>
+
+            <div class="progress-bar-bg">
+              <div class="progress-fill-success" id="prog-success" style="width:0%"></div>
+              <div class="progress-fill-fail" id="prog-fail" style="width:0%"></div>
+            </div>
+
+            <div class="sim-stats" style="margin-top: 6px;">
+              <span style="color:var(--accent-emerald);">● 100 Reserved (Lease Secured)</span>
+              <span style="color:var(--accent-rose);">● 9,900 Sold Out (409 Conflict)</span>
+              <span style="color:var(--accent-cyan);">● 0 Oversold</span>
+            </div>
+
+            <div style="margin-top: 8px;" id="sim-status"></div>
+
+            <div style="display:flex; gap:10px; margin-top:10px;">
+              <button class="btn-primary" id="btn-sim-10k" style="flex:1;">
+                Run 10,000 Contenders Simulation
+              </button>
+              <button class="btn-secondary" id="btn-reset-stock">Reset Stock (100)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACT 4: CloudWatch Observability & SNS Alerts -->
+      <div class="act-card glass" id="act-4-card" style="display:none;">
+        <div class="act-card-header">
+          <div class="act-card-title">
+            <h2>🟢 Act 4: Production Observability & Live CloudWatch Logs</h2>
+            <p>End-to-end request tracing via X-Correlation-ID and automated SNS alert topics</p>
+          </div>
+        </div>
+
+        <div class="speaker-notes-box">
+          <strong>Speaker Script (What to say to Judges):</strong>
+          <p>"Every request is tagged with a unique X-Correlation-ID header. All logs are streamed live to AWS CloudWatch with structured JSON formatting. We also configured automated SNS email alerting for CPU load (>80%), 5xx errors, and low database storage."</p>
+        </div>
+
+        <div class="test-actions">
+          <button class="btn-danger" id="btn-trigger-alarm">
+            <span>🚨</span> Trigger Synthetic Alarm: SALESTORM-HighCPU (>80%) & Test SNS Email
+          </button>
+          <div style="font-size: 11px; color: var(--text-muted);">
+            Connected SNS Topic: <code>arn:aws:sns:ap-south-1:135808933221:salestorm-alerts</code> ➔ <code>nithish.s.1622@gmail.com</code>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACT 5: Auto-Scaling & Resiliency -->
+      <div class="act-card glass" id="act-5-card" style="display:none;">
+        <div class="act-card-header">
+          <div class="act-card-title">
+            <h2>🟢 Act 5: Flash Sale Auto-Scaling & Resiliency</h2>
+            <p>Target tracking scaling policy: dynamically scales ECS Fargate tasks from 2 to 20</p>
+          </div>
+          <div class="live-badge" id="task-count-badge" style="background:rgba(0,245,160,0.15); border-color:#00f5a0;">
+            2 Tasks Active
+          </div>
+        </div>
+
+        <div class="speaker-notes-box">
+          <strong>Speaker Script (What to say to Judges):</strong>
+          <p>"During unexpected traffic spikes, our Application Auto Scaling policy automatically triggers and scales our ECS tasks from 2 up to 20 containers with zero downtime rolling deployments."</p>
+        </div>
+
+        <div class="test-actions">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label style="font-size:12px; font-weight:600;">Simulate Surge Traffic Volume:</label>
+            <span style="font-size:13px; font-family:var(--font-mono); color:var(--accent-cyan); font-weight:700;" id="surge-label">500 req/sec</span>
+          </div>
+          <input type="range" id="surge-slider" min="100" max="50000" step="500" value="500" style="width:100%; accent-color:var(--accent-cyan);">
+          <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); font-family:var(--font-mono);">
+            <span>Normal (2 Tasks)</span>
+            <span>Surge (8 Tasks)</span>
+            <span>Flash Peak (20 Tasks)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Terminal / CloudWatch Stream Console -->
+      <div class="console-panel">
+        <div class="console-header">
+          <span>📝 LIVE TELEMETRY & CLOUDWATCH LOG STREAM</span>
+          <span>LogGroup: /ecs/salestorm-api</span>
+        </div>
+        <div class="console-body" id="console-log-body">
+          <!-- Injected via app.js -->
+        </div>
+      </div>
+
+      <!-- Complete 12 AWS Services Interactive Catalog -->
+      <div class="act-card glass">
+        <div class="act-card-header">
+          <div class="act-card-title">
+            <h3 style="font-size:13px;">🏗️ All 12 AWS Infrastructure Services (Mapped from aws_services.md)</h3>
+            <p>Click any service to view exact Security Groups, Subnet CIDRs, and Port mappings</p>
+          </div>
+        </div>
+        <div class="catalog-grid" id="catalog-grid">
+          <!-- Injected via app.js -->
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Slide-Out Drawer for Service Specification Inspector -->
+  <div class="drawer-overlay" id="service-drawer" onclick="if(event.target===this) window.closeServiceDrawer();">
+    <div class="drawer-content">
+      <div class="drawer-header">
+        <div>
+          <h2 id="modal-service-name" style="font-size:18px; font-weight:700;">Service Name</h2>
+          <p id="modal-service-cat" style="font-size:12px; color:var(--accent-cyan);">Category</p>
+        </div>
+        <button class="drawer-close" onclick="window.closeServiceDrawer();">✕</button>
+      </div>
+
+      <table class="service-spec-table">
+        <tbody>
+          <tr>
+            <td>Ports / Protocols:</td>
+            <td id="modal-spec-ports">--</td>
+          </tr>
+          <tr>
+            <td>Security Group:</td>
+            <td id="modal-spec-sg">--</td>
+          </tr>
+          <tr>
+            <td>Subnet / Placement:</td>
+            <td id="modal-spec-subnets">--</td>
+          </tr>
+          <tr>
+            <td>Flash Sale Purpose:</td>
+            <td id="modal-spec-purpose" style="font-family:var(--font-sans);">--</td>
+          </tr>
+          <tr>
+            <td>Architectural Advantage:</td>
+            <td id="modal-spec-adv" style="font-family:var(--font-sans); color:var(--accent-emerald);">--</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <button class="btn-secondary" onclick="window.closeServiceDrawer();" style="margin-top:auto;">Close Inspector</button>
+    </div>
+  </div>
+
+  <!-- Custom Scripts -->
+  <script src="three-scene.js"></script>
+  <script src="app.js"></script>
+
+</body>
+</html>

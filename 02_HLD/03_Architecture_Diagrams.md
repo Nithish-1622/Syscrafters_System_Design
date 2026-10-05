@@ -24,28 +24,41 @@ This document provides the canonical set of 8 system architecture diagrams requi
 
 ## Diagram 1: System Context Diagram (C4 Level 1)
 
-The System Context diagram illustrates how SALESTORM fits into its external environment, interacting with customers, warehouse operators, and third-party SaaS providers.
+The System Context diagram illustrates how SALESTORM fits into its external environment, interacting with customers, warehouse operators, and third-party SaaS providers without line collisions or overlapping text.
 
 ```mermaid
-C4Context
-    title System Context Diagram (C4 Level 1) - SALESTORM Flash-Sale Platform
+flowchart TB
+    subgraph Actors ["1. Users & Personas"]
+        direction LR
+        Customer["👤 Flash-Sale Customer<br/><b>10,000 Concurrent Buyers</b><br/>Mobile App & Web Browser"]
+        Operator["👷 Warehouse Operator<br/><b>Logistics & Dispatch</b><br/>Internal Admin Portal"]
+    end
 
-    Person(customer, "Customer", "Flash-sale buyer accessing platform via Mobile App or Web Browser")
-    Person(operator, "Warehouse Operator", "Logistics personnel managing stock fulfillment and dispatch")
+    subgraph Boundary ["2. SALESTORM Enterprise Platform Boundary"]
+        Core["⚡ SALESTORM E-Commerce Core Engine<br/>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br/>• Sub-5ms Atomic Inventory Reservation Engine<br/>• Real-Time Flash-Sale Catalog & Traffic Gate<br/>• Idempotent Payment & Outbox Orchestrator<br/>• Event-Driven Order State Machine & Fulfillment"]
+    end
 
-    Enterprise_Boundary(salestorm_boundary, "SALESTORM Enterprise Platform") {
-        System(salestorm, "SALESTORM E-Commerce Core", "Handles catalog browsing, atomic reservations, payments, order lifecycle, and fulfillment")
-    }
+    subgraph ExternalSaaS ["3. External Partner Ecosystem (Third-Party SaaS)"]
+        direction LR
+        PayGW["💳 Payment Gateway<br/><b>Stripe / Adyen</b><br/>Tokenized Charges & 3DS"]
+        Carrier["🚚 Logistics Carrier<br/><b>FedEx / DHL</b><br/>Waybills & Tracking"]
+        Comms["📲 Comms Provider<br/><b>Twilio / SendGrid</b><br/>SMS, Push & Email Alerts"]
+    end
 
-    System_Ext(payment_gateway, "Payment Gateway (Stripe/Adyen)", "Processes credit cards, UPI, digital wallets, and 3D Secure authentication")
-    System_Ext(shipping_carrier, "Logistics & Carrier Partner (FedEx/DHL)", "Generates waybills, manifests, and real-time delivery tracking events")
-    System_Ext(comms_gateway, "Notification Providers (Twilio/SendGrid)", "Dispatches SMS, OTP, Push notifications, and confirmation emails")
+    Customer ==>|"HTTPS / TLS 1.3<br/>10k Concurrent Buy-Now"| Core
+    Operator ==>|"Internal HTTPS<br/>Inventory & Restock"| Core
 
-    Rel(customer, salestorm, "Browses products, places 10,000 concurrent Buy Now requests, completes payment", "HTTPS / TLS 1.3")
-    Rel(operator, salestorm, "Updates physical inventory, manages pack & dispatch queues", "HTTPS / Internal Portal")
-    Rel(salestorm, payment_gateway, "Initiates charges, authorizes payments, verifies webhooks", "HTTPS / REST API")
-    Rel(salestorm, shipping_carrier, "Dispatches shipment manifests, fetches tracking milestones", "HTTPS / REST API")
-    Rel(salestorm, comms_gateway, "Sends transactional SMS, WhatsApp, and email alerts", "HTTPS / REST API")
+    Core -->|"REST API / Webhooks<br/>Auth & Charge"| PayGW
+    Core -->|"REST API<br/>Manifest Dispatch"| Carrier
+    Core -->|"Async REST<br/>Transactional Alerts"| Comms
+
+    classDef actorStyle fill:#1e3a8a,stroke:#3b82f6,stroke-width:2px,color:#ffffff;
+    classDef coreStyle fill:#065f46,stroke:#10b981,stroke-width:2px,color:#ffffff;
+    classDef extStyle fill:#374151,stroke:#9ca3af,stroke-width:2px,color:#ffffff;
+
+    class Customer,Operator actorStyle;
+    class Core coreStyle;
+    class PayGW,Carrier,Comms extStyle;
 ```
 
 ---
@@ -56,106 +69,139 @@ The High-Level Architecture depicts the overall logical system topology, showcas
 
 ```mermaid
 flowchart TB
-    subgraph Ingress ["1. Ingress & Edge Protection Tier"]
-        Users["10,000 Flash-Sale Clients"] -->|"HTTPS / TLS 1.3"| CDN["Edge CDN / WAF (DDoS & Bot Mitigation)"]
-        CDN -->|"Scrubbed Traffic"| ALB["Application Load Balancer (ALB)"]
-        ALB -->|"HTTP/2 Multiplexed"| APIGW["API Gateway Cluster (Auth, Rate Limiting, Routing)"]
+    subgraph IngressTier ["1. Ingress & Edge Protection Tier"]
+        Users["👥 10,000 Flash-Sale Clients"] -->|"HTTPS / TLS 1.3"| CDN["🛡️ Edge CDN / WAF<br/>DDoS Mitigation & Bot Shield"]
+        CDN -->|"Scrubbed Traffic"| ALB["⚖️ Application Load Balancer (ALB)<br/>SSL Termination & Health Checks"]
+        ALB -->|"HTTP/2 Forward"| APIGW["🚪 API Gateway Cluster<br/>JWT Auth, Token Bucket Rate Limiting"]
     end
 
-    subgraph SyncServices ["2. Synchronous Scarcity & Checkout Domain"]
-        APIGW -->|"Read Query"| ProdSvc["Product Service"]
-        APIGW -->|"Express Buy Now"| CheckSvc["Checkout Service"]
-        APIGW -->|"Direct Cart Ops"| CartSvc["Cart Service"]
-
-        CheckSvc -->|"gRPC Atomic Reserve"| InvSvc["Inventory Service"]
-        CheckSvc -->|"HTTPS Authorize"| PaySvc["Payment Service"]
-    end
-
-    subgraph FastStorage ["3. In-Memory Contention Arbiter"]
-        InvSvc <-->|"Atomic Lua Decrement"| RedisInv[("Redis Cluster\n(Stock Shards + Leases)")]
-        ProdSvc <-->|"Read-Through Cache"| RedisCat[("Redis Catalog Cache")]
-        CartSvc <-->|"Session Hash"| RedisCart[("Redis Cart Store")]
-    end
-
-    subgraph AsyncPipeline ["4. Asynchronous Event Pipeline (Durable Decoupling)"]
-        PaySvc -->|"Outbox Emit: PaymentSuccessful"| MsgBroker{{"Distributed Message Broker\n(Kafka / Event Log)"}}
-        InvSvc -->|"Outbox Emit: StockReserved"| MsgBroker
+    subgraph SyncTier ["2. Synchronous Scarcity & Checkout Domain"]
+        APIGW -->|"Product Read"| ProdSvc["📦 Product Service<br/>Catalog & Stock Cache"]
+        APIGW -->|"Express Buy-Now"| CheckSvc["⚡ Checkout Service<br/>Session Orchestrator"]
         
-        MsgBroker -->|"Consumer: At-Least-Once"| OrdSvc["Order Service"]
-        MsgBroker -->|"Consumer: Delivery Events"| ShipSvc["Shipment Service"]
-        MsgBroker -->|"Consumer: Multi-Channel"| NotifSvc["Notification Service"]
+        CheckSvc -->|"gRPC Call"| InvSvc["🎯 Inventory Service<br/>Atomic Lua Engine"]
+        CheckSvc -->|"REST / HTTPS"| PaySvc["💳 Payment Service<br/>Idempotent Processor"]
     end
 
-    subgraph DurableStorage ["5. Persistent ACID Datastores (RDBMS)"]
-        InvSvc --- DB_Inv[("PostgreSQL\nInventory DB")]
-        PaySvc --- DB_Pay[("PostgreSQL\nPayment DB")]
-        OrdSvc --- DB_Ord[("PostgreSQL\nOrder DB")]
-        ShipSvc --- DB_Ship[("PostgreSQL\nShipment DB")]
+    subgraph FastTier ["3. In-Memory Contention Arbiter"]
+        InvSvc <-->|"Atomic Lua Script<br/>DECRBY stock"| RedisInv[("⚡ Redis 7.x Cluster<br/>Stock Shards & 300s Leases")]
+        ProdSvc <-->|"Read-Through"| RedisCat[("⚡ Redis Catalog Cache")]
     end
 
-    subgraph External ["6. External Enterprise Gateways"]
-        PaySvc <-->|"PCI Tokenized Charge"| ExtPay["Payment Gateway\n(Max 2,000 TPS)"]
-        ShipSvc <-->|"API Manifest"| ExtShip["Carrier API"]
-        NotifSvc -->|"SMTP / SMS API"| ExtNotif["Notification Provider"]
+    subgraph AsyncTier ["4. Durable Event Bus (Decoupling Tier)"]
+        InvSvc -.->|"Outbox: StockReserved"| Broker{{"📬 Distributed Event Bus<br/>Kafka / Persistent Outbox Stream"}}
+        PaySvc -.->|"Outbox: PaymentSuccessful"| Broker
+        
+        Broker ==>|"Event Stream"| OrdSvc["📋 Order Service<br/>Idempotent Consumer"]
+        Broker ==>|"Event Stream"| ShipSvc["🚚 Shipment Service<br/>Batch Logistics"]
+        Broker ==>|"Event Stream"| NotifSvc["🔔 Notification Service<br/>Multi-channel Push"]
     end
 
-    classDef ingress fill:#e1f5fe,stroke:#0288d1,stroke-width:2px;
-    classDef sync fill:#e8f5e9,stroke:#388e3c,stroke-width:2px;
-    classDef async fill:#fff3e0,stroke:#f57c00,stroke-width:2px;
-    classDef storage fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
-    classDef external fill:#eceff1,stroke:#607d8b,stroke-width:2px;
+    subgraph StorageTier ["5. ACID Relational Databases (Private Subnets)"]
+        InvSvc --- DB_Inv[("💾 Inventory DB<br/>PostgreSQL 16")]
+        PaySvc --- DB_Pay[("💾 Payment DB<br/>PostgreSQL 16")]
+        OrdSvc --- DB_Ord[("💾 Order DB<br/>PostgreSQL 16")]
+    end
 
-    class Users,CDN,ALB,APIGW ingress;
-    class ProdSvc,CheckSvc,CartSvc,InvSvc,PaySvc sync;
-    class MsgBroker,OrdSvc,ShipSvc,NotifSvc async;
-    class RedisInv,RedisCat,RedisCart,DB_Inv,DB_Pay,DB_Ord,DB_Ship storage;
-    class ExtPay,ExtShip,ExtNotif external;
+    subgraph ExtTier ["6. External Enterprise Services"]
+        PaySvc <-->|"PCI Token Charge"| ExtPay["💳 Stripe / Adyen<br/>(Max 2,000 TPS)"]
+        ShipSvc <-->|"Carrier API"| ExtShip["🚚 FedEx / DHL"]
+        NotifSvc -->|"Webhooks"| ExtNotif["📲 Twilio / SendGrid"]
+    end
+
+    classDef ingressStyle fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc;
+    classDef syncStyle fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#f8fafc;
+    classDef storageStyle fill:#312e81,stroke:#818cf8,stroke-width:2px,color:#f8fafc;
+    classDef asyncStyle fill:#78350f,stroke:#fbbf24,stroke-width:2px,color:#f8fafc;
+    classDef extStyle fill:#374151,stroke:#9ca3af,stroke-width:2px,color:#f8fafc;
+
+    class Users,CDN,ALB,APIGW ingressStyle;
+    class ProdSvc,CheckSvc,InvSvc,PaySvc syncStyle;
+    class RedisInv,RedisCat,DB_Inv,DB_Pay,DB_Ord storageStyle;
+    class Broker,OrdSvc,ShipSvc,NotifSvc asyncStyle;
+    class ExtPay,ExtShip,ExtNotif extStyle;
 ```
 
 ---
 
 ## Diagram 3: Container / Service Diagram (C4 Level 2)
 
-This diagram details the containerized microservices, their runtime communication protocols, and their private encapsulated datastores.
+This diagram details the containerized microservices, their runtime communication protocols, and their private encapsulated datastores arranged in distinct, non-overlapping architectural layers.
 
 ```mermaid
-C4Container
-    title Container Diagram (C4 Level 2) - Microservice Architecture & Protocols
+flowchart TB
+    subgraph ClientLayer ["Layer 1: Client Applications & Presentation"]
+        direction LR
+        MobileApp["📱 Mobile App<br/>(iOS / Android Native)"]
+        WebApp["💻 Web Storefront<br/>(Next.js / React SPA)"]
+    end
 
-    Person(user, "User Mobile/Web App", "Interacts via REST APIs and WebSocket push channels")
+    subgraph GatewayLayer ["Layer 2: Edge & API Gateway Container"]
+        APIGW["🚪 API Gateway Container<br/>[Envoy / FastAPI Ingress Proxy]<br/>• TLS 1.3 Termination • JWT Token Validation<br/>• Per-IP Rate Limiting (Token Bucket) • Request Routing"]
+    end
 
-    Container(api_gw, "API Gateway Cluster", "Envoy / Go Gateway", "Performs JWT validation, rate-limiting, CORS, and TLS termination")
+    subgraph SyncServiceLayer ["Layer 3: Core Containerized Microservices (Stateless)"]
+        direction LR
+        InvContainer["🎯 Inventory Service<br/>[Docker / FastAPI]<br/>• Atomic Reservation<br/>• Lua Engine Driver<br/>• Outbox Event Producer"]
+        CheckContainer["⚡ Checkout Service<br/>[Docker / FastAPI]<br/>• Cart Aggregation<br/>• Checkout Session<br/>• Flow Orchestrator"]
+        PayContainer["💳 Payment Service<br/>[Docker / FastAPI]<br/>• Idempotency Engine<br/>• Gateway Integration<br/>• Outbox Event Producer"]
+    end
 
-    Container(prod_svc, "Product Service", "Node.js / Go", "Serves catalog metadata and cached stock indicators")
-    Container(inv_svc, "Inventory Service", "Java / Spring Boot", "Executes atomic reservation engine and lease tracking")
-    Container(check_svc, "Checkout Service", "Go / gRPC", "Orchestrates order context and checkout sessions")
-    Container(pay_svc, "Payment Service", "Go / Java", "Integrates with payment processors and guarantees payment idempotency")
-    Container(ord_svc, "Order Service", "Java / Spring Boot", "Maintains canonical immutable order records and state lifecycle")
-    Container(ship_svc, "Shipment Service", "Python / Go", "Handles logistics batching, carrier manifest generation, and tracking")
-    Container(notif_svc, "Notification Service", "Node.js Worker", "Dispatches transactional emails, push notifications, and SMS")
+    subgraph InMemAndQueueLayer ["Layer 4: In-Memory Arbiter & Event Bus"]
+        direction LR
+        RedisContainer[("⚡ Distributed In-Memory Cache<br/>[Docker / Redis 7.x Alpine]<br/>• Atomic Lua Stock Decrement<br/>• 300-Second Lease TTL Manager<br/>• Read-Through Catalog Cache")]
+        QueueContainer{{"📬 High-Throughput Event Streaming Bus<br/>[Docker / Apache Kafka or Async Broker]<br/>• Topic: payment-events (Partitions 0..3)<br/>• Topic: order-events (Partitions 0..3)<br/>• Topic: inventory-events"}}
+    end
 
-    ContainerDb(redis_cluster, "Distributed Cache / Redis Cluster", "Redis 7.x", "In-memory atomic Lua scripts, active leases, sorted sets")
-    ContainerDb(inv_db, "Inventory Database", "PostgreSQL 16", "ACID storage for stock balances, reservation logs, outbox")
-    ContainerDb(pay_db, "Payment Database", "PostgreSQL 16", "PCI-compliant transaction audit log, idempotency keys")
-    ContainerDb(ord_db, "Order Database", "PostgreSQL 16", "Canonical order aggregates, line items, order history")
+    subgraph AsyncServiceLayer ["Layer 5: Asynchronous Consumer Microservices"]
+        direction LR
+        OrdContainer["📋 Order Service<br/>[Docker / FastAPI & Worker]<br/>• Idempotent Inbox Consumer<br/>• Order State Machine (CONFIRMED)<br/>• Fulfillment Dispatch Trigger"]
+        ShipContainer["🚚 Shipment Service<br/>[Docker Worker]<br/>• Waybill Generator<br/>• Carrier Manifest Batcher"]
+        NotifContainer["🔔 Notification Service<br/>[Docker Worker]<br/>• SMS / WhatsApp Relay<br/>• Email Receipt Dispatcher"]
+    end
 
-    ContainerQueue(kafka, "Message Broker", "Apache Kafka / Durable Log", "High-throughput partitioned event streaming bus")
+    subgraph DatabaseLayer ["Layer 6: Isolated Relational Datastores (ACID Persistence)"]
+        direction LR
+        InvDB[("💾 Inventory Datastore<br/>[PostgreSQL 16]<br/>• inventory_items<br/>• reservations (TTL)<br/>• inventory_outbox")]
+        PayDB[("💾 Payment Datastore<br/>[PostgreSQL 16]<br/>• payment_records<br/>• idempotency_keys<br/>• payment_outbox")]
+        OrdDB[("💾 Order Datastore<br/>[PostgreSQL 16]<br/>• customer_orders<br/>• order_line_items<br/>• processed_inbox")]
+    end
 
-    Rel(user, api_gw, "API Calls", "HTTPS / JSON")
-    Rel(api_gw, prod_svc, "Catalog requests", "HTTP/REST")
-    Rel(api_gw, check_svc, "Buy Now / Checkout", "HTTP/REST")
-    Rel(check_svc, inv_svc, "Reserve stock", "gRPC / Protobuf")
-    Rel(check_svc, pay_svc, "Initiate payment", "gRPC / Protobuf")
+    %% Layer Connections - Clean, Vertical, Labelled
+    MobileApp & WebApp -->|"HTTPS / REST API"| APIGW
 
-    Rel(inv_svc, redis_cluster, "Atomic decrement / lease check", "RESP Protocol")
-    Rel(inv_svc, inv_db, "Persist confirmed reservations", "JDBC / SQL")
-    Rel(pay_svc, pay_db, "Record transaction states", "JDBC / SQL")
-    Rel(pay_svc, kafka, "Publish: PaymentSuccessfulEvent", "TCP / Kafka Protocol")
-    Rel(ord_svc, kafka, "Subscribe: PaymentSuccessfulEvent", "TCP / Kafka Protocol")
-    Rel(ord_svc, ord_db, "Persist confirmed order", "JDBC / SQL")
-    Rel(ord_svc, kafka, "Publish: OrderCreatedEvent", "TCP / Kafka Protocol")
-    Rel(ship_svc, kafka, "Subscribe: OrderCreatedEvent", "TCP / Kafka Protocol")
-    Rel(notif_svc, kafka, "Subscribe: System Events", "TCP / Kafka Protocol")
+    APIGW -->|"POST /reserve"| InvContainer
+    APIGW -->|"POST /checkout"| CheckContainer
+    APIGW -->|"POST /payments"| PayContainer
+
+    CheckContainer -->|"Internal gRPC / REST"| InvContainer
+    CheckContainer -->|"Internal gRPC / REST"| PayContainer
+
+    InvContainer <==>|"RESP Protocol<br/>EVALSHA Atomic Lua"| RedisContainer
+    InvContainer -->|"SQL / Transactional Outbox"| InvDB
+
+    PayContainer -->|"SQL / ACID Insert"| PayDB
+    PayContainer -.->|"Emit PaymentSuccessful"| QueueContainer
+
+    QueueContainer ==>|"Subscribe: PaymentSuccessful"| OrdContainer
+    QueueContainer ==>|"Subscribe: OrderCreated"| ShipContainer
+    QueueContainer ==>|"Subscribe: SystemEvents"| NotifContainer
+
+    OrdContainer -->|"SQL / Idempotent Commit"| OrdDB
+
+    classDef client fill:#1e293b,stroke:#64748b,stroke-width:2px,color:#f8fafc;
+    classDef gw fill:#0f172a,stroke:#0284c7,stroke-width:2px,color:#f8fafc;
+    classDef sync fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#f8fafc;
+    classDef mid fill:#312e81,stroke:#6366f1,stroke-width:2px,color:#f8fafc;
+    classDef async fill:#78350f,stroke:#f59e0b,stroke-width:2px,color:#f8fafc;
+    classDef db fill:#1e1b4b,stroke:#a855f7,stroke-width:2px,color:#f8fafc;
+
+    class MobileApp,WebApp client;
+    class APIGW gw;
+    class InvContainer,CheckContainer,PayContainer sync;
+    class RedisContainer,QueueContainer mid;
+    class OrdContainer,ShipContainer,NotifContainer async;
+    class InvDB,PayDB,OrdDB db;
 ```
 
 ---
