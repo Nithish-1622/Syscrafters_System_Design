@@ -1,0 +1,616 @@
+openapi: 3.1.0
+info:
+  title: SALESTORM High-Scale Flash-Sale API Engine
+  version: 1.0.0
+  description: |
+    Production-grade RESTful API contract for the SALESTORM 2026 flash-sale platform.
+    Designed for extreme burst concurrency (500,000 req/sec), zero overselling, 
+    strict idempotency, and asynchronous event-driven order processing.
+servers:
+  - url: https://api.salestorm.io/api/v1
+    description: Production Edge Gateway
+  - url: http://localhost:8080/api/v1
+    description: Local Development & Validation Harness
+
+paths:
+  /products:
+    get:
+      summary: Discover and list catalog products
+      description: Returns paginated catalog items with cursor pagination. Highly cached at CDN.
+      operationId: listProducts
+      tags:
+        - Product Discovery
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Paginated product list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductResponse'
+
+  /products/{productId}:
+    get:
+      summary: Retrieve single product details with real-time flash deal info
+      operationId: getProductById
+      tags:
+        - Product Discovery
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Product details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /reservations:
+    post:
+      summary: Create inventory reservation (Checkout hold)
+      description: |
+        Crucial high-concurrency endpoint. Holds stock for 5 minutes during checkout.
+        Enforces strict mathematical non-overselling via atomic conditional persistence.
+      operationId: createReservation
+      tags:
+        - Inventory & Reservation
+      security:
+        - BearerAuth: []
+      headers:
+        Idempotency-Key:
+          $ref: '#/components/headers/Idempotency-Key'
+        X-Correlation-Id:
+          $ref: '#/components/headers/X-Correlation-Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReservationRequest'
+      responses:
+        '201':
+          description: Reservation created successfully
+          headers:
+            Idempotency-Key:
+              $ref: '#/components/headers/Idempotency-Key'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+        '200':
+          description: Duplicate request replayed (Idempotent cache hit)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Out of stock or concurrent reservation in-flight
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422':
+          description: Idempotency key payload mismatch
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /reservations/{reservationId}/confirm:
+    post:
+      summary: Manually or system confirm reservation
+      operationId: confirmReservation
+      tags:
+        - Inventory & Reservation
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: reservationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Reservation confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Reservation expired or already released
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /reservations/{reservationId}/release:
+    post:
+      summary: Release held inventory back to available pool
+      description: Invoked upon user cart abandonment, explicit cancellation, or payment decline.
+      operationId: releaseReservation
+      tags:
+        - Inventory & Reservation
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: reservationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Reservation released and stock returned to pool
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reservation_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    example: RELEASED
+                  released_at:
+                    type: string
+                    format: date-time
+
+  /payments:
+    post:
+      summary: Initiate customer payment
+      description: Charges payment method for an active reservation hold.
+      operationId: initiatePayment
+      tags:
+        - Payment
+      security:
+        - BearerAuth: []
+      headers:
+        Idempotency-Key:
+          $ref: '#/components/headers/Idempotency-Key'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitiatePaymentRequest'
+      responses:
+        '201':
+          description: Payment initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '200':
+          description: Duplicate payment replayed (Idempotent cache hit)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Reservation expired or already paid
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /payments/{paymentId}:
+    get:
+      summary: Get payment status
+      operationId: getPaymentById
+      tags:
+        - Payment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /payments/webhook:
+    post:
+      summary: Payment Provider Webhook Callback
+      description: External gateway callback (Stripe/Adyen) verifying asynchronous settlement.
+      operationId: handlePaymentWebhook
+      tags:
+        - Payment
+      headers:
+        X-Signature-SHA256:
+          schema:
+            type: string
+          required: true
+          description: HMAC-SHA256 webhook signature.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentWebhookPayload'
+      responses:
+        '200':
+          description: Webhook processed idempotently
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+                    example: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Invalid webhook HMAC signature
+
+  /orders:
+    post:
+      summary: Create Order from confirmed reservation/payment
+      operationId: createOrder
+      tags:
+        - Orders
+      security:
+        - BearerAuth: []
+      headers:
+        Idempotency-Key:
+          $ref: '#/components/headers/Idempotency-Key'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '409':
+          description: Order already created for this reservation
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /orders/{orderId}:
+    get:
+      summary: Retrieve order by ID
+      operationId: getOrderById
+      tags:
+        - Orders
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  headers:
+    Idempotency-Key:
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+      description: Unique client token ensuring safe network retries without duplication.
+    X-Correlation-Id:
+      required: false
+      schema:
+        type: string
+      description: Distributed tracing correlation identifier.
+
+  responses:
+    BadRequest:
+      description: Malformed input syntax or schema validation failure
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    Unauthorized:
+      description: Authentication credentials missing or invalid
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    RateLimited:
+      description: Client exceeded rate quota
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+
+  schemas:
+    ProblemDetails:
+      type: object
+      required:
+        - type
+        - title
+        - status
+        - detail
+        - instance
+      properties:
+        type:
+          type: string
+          format: uri
+          example: https://errors.salestorm.io/inventory/out-of-stock
+        title:
+          type: string
+          example: Out of Stock
+        status:
+          type: integer
+          example: 409
+        detail:
+          type: string
+          example: Requested quantity exceeds currently available inventory.
+        instance:
+          type: string
+          example: /api/v1/reservations
+        code:
+          type: string
+          example: INVENTORY_OUT_OF_STOCK
+        correlation_id:
+          type: string
+          example: req-98a7-4b82-9e2c
+
+    Product:
+      type: object
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        sku:
+          type: string
+        base_price:
+          type: number
+          format: float
+        currency:
+          type: string
+        is_flash_sale:
+          type: boolean
+        flash_deal:
+          type: object
+          nullable: true
+          properties:
+            sale_price:
+              type: number
+            starts_at:
+              type: string
+              format: date-time
+            ends_at:
+              type: string
+              format: date-time
+
+    PaginatedProductResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        next_cursor:
+          type: string
+          nullable: true
+
+    CreateReservationRequest:
+      type: object
+      required:
+        - product_id
+        - quantity
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 2
+          example: 1
+
+    ReservationResponse:
+      type: object
+      properties:
+        reservation_id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+        status:
+          type: string
+          enum: [RESERVED, PAYMENT_PENDING, CONFIRMED, RELEASED, EXPIRED]
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    InitiatePaymentRequest:
+      type: object
+      required:
+        - reservation_id
+        - amount
+        - currency
+        - payment_method_token
+      properties:
+        reservation_id:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          example: 499.00
+        currency:
+          type: string
+          example: USD
+        payment_method_token:
+          type: string
+          example: tok_visa_test_123
+
+    PaymentResponse:
+      type: object
+      properties:
+        payment_id:
+          type: string
+          format: uuid
+        reservation_id:
+          type: string
+          format: uuid
+        amount:
+          type: number
+        currency:
+          type: string
+        status:
+          type: string
+          enum: [INITIATED, PROCESSING, SUCCEEDED, FAILED, TIMED_OUT, RECONCILIATION_REQUIRED]
+        provider_transaction_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    PaymentWebhookPayload:
+      type: object
+      required:
+        - event_id
+        - event_type
+        - provider_transaction_id
+        - status
+      properties:
+        event_id:
+          type: string
+        event_type:
+          type: string
+          example: payment_intent.succeeded
+        provider_transaction_id:
+          type: string
+          example: ch_3N4x9kLjd012
+        reservation_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          example: SUCCEEDED
+        amount_received:
+          type: number
+
+    CreateOrderRequest:
+      type: object
+      required:
+        - reservation_id
+        - payment_id
+        - shipping_address
+      properties:
+        reservation_id:
+          type: string
+          format: uuid
+        payment_id:
+          type: string
+          format: uuid
+        shipping_address:
+          type: object
+          required: [street, city, state, postal_code, country]
+          properties:
+            street: { type: string }
+            city: { type: string }
+            state: { type: string }
+            postal_code: { type: string }
+            country: { type: string }
+
+    OrderResponse:
+      type: object
+      properties:
+        order_id:
+          type: string
+          format: uuid
+        order_number:
+          type: string
+          example: ORD-20261005-9821
+        status:
+          type: string
+          enum: [CREATED, PAYMENT_PENDING, CONFIRMED, PROCESSING, SHIPPED, OUT_FOR_DELIVERY, DELIVERED]
+        total_amount:
+          type: number
+        currency:
+          type: string
+        created_at:
+          type: string
+          format: date-time
