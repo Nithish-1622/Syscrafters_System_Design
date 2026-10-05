@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: salestorm-postgres
+    environment:
+      POSTGRES_DB: salestorm_db
+      POSTGRES_USER: salestorm_user
+      POSTGRES_PASSWORD: salestorm_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./04_Database/schema.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U salestorm_user -d salestorm_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - salestorm-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: salestorm-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - salestorm-net
+
+  api-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: salestorm-api
+    environment:
+      DATABASE_URL: postgresql://salestorm_user:salestorm_password@postgres:5432/salestorm_db
+      REDIS_URL: redis://redis:6379/0
+      PORT: 8080
+      HOST: 0.0.0.0
+      INITIAL_STOCK: 100
+      RESERVATION_LEASE_SECONDS: 300
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - salestorm-net
+
+networks:
+  salestorm-net:
+    driver: bridge
+
+volumes:
+  pgdata:
