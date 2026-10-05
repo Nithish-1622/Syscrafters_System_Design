@@ -1,0 +1,55 @@
+{
+  "family": "salestorm-api",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::144916746258:role/salestorm-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::144916746258:role/salestorm-ecs-task-role",
+  "containerDefinitions": [
+    {
+      "name": "salestorm-api",
+      "image": "144916746258.dkr.ecr.ap-south-1.amazonaws.com/salestorm:latest",
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "hostPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:144916746258:secret:salestorm/database-url-JzE6B9"
+        },
+        {
+          "name": "REDIS_URL",
+          "valueFrom": "arn:aws:secretsmanager:ap-south-1:144916746258:secret:salestorm/redis-url-1xr82h"
+        }
+      ],
+      "environment": [
+        {"name": "PORT", "value": "8080"},
+        {"name": "HOST", "value": "0.0.0.0"},
+        {"name": "INITIAL_STOCK", "value": "100"},
+        {"name": "RESERVATION_LEASE_SECONDS", "value": "300"},
+        {"name": "FLASH_SALE_PRODUCT_ID", "value": "550e8400-e29b-41d4-a716-446655440000"},
+        {"name": "ENVIRONMENT", "value": "production"}
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/salestorm-api",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ]
+}

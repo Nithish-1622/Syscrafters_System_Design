@@ -633,7 +633,7 @@ $SNS_ARN = (aws sns list-topics `
 aws sns subscribe `
   --topic-arn $SNS_ARN `
   --protocol email `
-  --notification-endpoint your-team-email@example.com
+  --notification-endpoint nithish.s.1622@gmail.com
 
 # ALARM 1: CPU > 80% for 5 minutes
 aws cloudwatch put-metric-alarm `
