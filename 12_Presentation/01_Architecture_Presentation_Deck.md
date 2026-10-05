@@ -139,6 +139,7 @@
 ### Slide 7: Scalability Toward 500,000 RPS & Cloud Architecture (4:30 – 5:00)
 
 #### Slide Visuals:
+- **Architecture Graphic:** ![SALESTORM AWS Architecture](aws_docker_architecture.jpg)
 - **Scaling Diagram:** 10,000 req/s $\rightarrow$ 500,000 req/s.
 - **The 3 Bottlenecks:**
   1. Ingress Sockets $\rightarrow$ Mitigated by Edge Shedding & HTTP/2.

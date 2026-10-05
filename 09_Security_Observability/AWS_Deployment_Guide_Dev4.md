@@ -4,11 +4,14 @@
 **Document Version:** 1.0.0  
 **Author:** Member 1 (System Architect) — For Dev4 Handoff  
 **Target:** Host SALESTORM FastAPI + PostgreSQL + Redis on AWS using Docker  
-**Estimated Time:** 3–4 hours (first-time setup)
+**Estimated Time:** 3–4 hours (first-time setup)  
+**Detailed Diagram Specification:** See [AWS_Docker_Architecture_Diagram.md](file:///d:/Syscrafters_System_Design/09_Security_Observability/AWS_Docker_Architecture_Diagram.md) for the full Mermaid diagram & jury presentation talking points.
 
 ---
 
 ## 📐 Architecture You Will Deploy
+
+![SALESTORM AWS Docker Architecture](aws_docker_architecture.jpg)
 
 ```
                         ┌─────────────────────────────────────────────┐
