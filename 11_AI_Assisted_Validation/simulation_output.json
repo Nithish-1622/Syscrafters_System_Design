@@ -1,0 +1,41 @@
+{
+  "test_timestamp": 1791177553.3536978,
+  "config": {
+    "initial_stock": 100,
+    "total_customers": 10000,
+    "payment_success_rate": 0.95,
+    "duplicate_rate": 0.02
+  },
+  "metrics": {
+    "total_requests": 10000,
+    "duplicate_requests_sent": 200,
+    "idempotent_duplicate_hits": 5,
+    "successful_reservations": 107,
+    "out_of_stock_rejections": 9888,
+    "payments_attempted": 107,
+    "payments_succeeded": 100,
+    "payments_failed": 7,
+    "compensating_releases": 7,
+    "orders_buffered_during_outage": 100,
+    "orders_confirmed_after_recovery": 100
+  },
+  "ledger": {
+    "total_quantity": 100,
+    "available_quantity": 0,
+    "reserved_quantity": 0,
+    "sold_quantity": 100
+  },
+  "counts": {
+    "confirmed_reservations": 100,
+    "released_reservations": 7,
+    "confirmed_orders": 100,
+    "succeeded_payments": 100,
+    "failed_payments": 7
+  },
+  "invariants_passed": {
+    "no_overselling": true,
+    "conservation_law": true,
+    "zero_order_loss_during_outage": true,
+    "idempotency_deduplication_exact": false
+  }
+}
